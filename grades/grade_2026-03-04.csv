@@ -1,6 +1,4 @@
-﻿dia,horario,title,episodeName,content_episode,mediaId
-04/03/2026,13:35,Show do Milhão,Programa de 15/04/2001,163,6c44d0b9-3ed3-423b-af02-6c6460da2620
-04/03/2026,13:48,Porta da Esperança,Programa de 10/05/1987,7,6362543479112
+﻿Data,Hora,Programa,Episódio,Nº do episódio,Media
 04/03/2026,14:45,Programa do Ratinho,Programa de 17/10/98,Episódio 34,98008609_programadoratinho_1998_034_01
 04/03/2026,16:05,Eliana & Cia,Programa de 01/10/1997,118,005bbfac-a252-4792-9d23-6dc5b9e7bf45
 04/03/2026,16:48,Táxi do Gugu,ET,23,07af3fb1-828f-46fc-abf5-39e1fa1c0726
@@ -190,3 +188,5 @@
 11/03/2026,10:55,"Canta e Dança, Minha Gente",Programa de 21/11/1999,Programa de 21/11/1999,6348924282112
 11/03/2026,11:54,TV Animal,Programa de 16/11/1995,29,6365801091112
 11/03/2026,12:39,Show do Milhão,Programa de 05/04/2001,168,b52cf8bd-d131-4724-981d-f0cedac036dd
+11/03/2026,13:49,Porta da Esperança,Programa de 17/05/1987,8,6362546115112
+11/03/2026,14:50,Programa do Ratinho,Programa de 23/10/98,Episódio 39,98008609_programadoratinho_1998_039_01
