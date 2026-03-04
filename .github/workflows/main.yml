@@ -1,0 +1,33 @@
+name: Gerador de Historico de Grade
+
+on:
+  schedule:
+    # Roda a cada 3 dias às 03:00 UTC (00:00 Horário de Brasília)
+    - cron: '0 3 */3 * *'
+  workflow_dispatch: # Botão para rodar manualmente no site
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Instalar Dependencias
+        run: pip install pandas requests
+
+      - name: Executar Script
+        run: python processar_grade.py
+
+      - name: Salvar Mudancas no Github
+        run: |
+          git config --global user.name 'GradeBot'
+          git config --global user.email 'bot@github.com'
+          git add grades/*.csv
+          git commit -m "Nova grade adicionada ao historico" || exit 0
+          git push
