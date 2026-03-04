@@ -28,6 +28,16 @@ try:
     colunas_finais = ['dia', 'horario', 'title', 'episodeName', 'content_episode', 'mediaId']
     df_resultado = df[colunas_finais]
 
+    # Renomear para ficar "bonito" no CSV
+    df_resultado = df_resultado.rename(columns={
+        'dia': 'Data',
+        'horario': 'Hora',
+        'title': 'Programa',
+        'episodeName': 'Episódio',
+        'content_episode': 'Nº do episódio',
+        'mediaId': 'Media'
+    })
+
     # 5. Nome do arquivo dentro da pasta 'historico'
     data_hoje = datetime.now().strftime('%Y-%m-%d')
     nome_arquivo = f"grades/grade_{data_hoje}.csv"
