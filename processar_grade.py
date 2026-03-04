@@ -8,8 +8,8 @@ URL_JSON = "https://bridge.evrideo.tv/SBTEPG?ChannelUID=raiz&DurationHours=168"
 
 try:
     # 1. Criar a pasta 'historico' se ela não existir
-    if not os.path.exists('historico'):
-        os.makedirs('historico')
+    if not os.path.exists('grades'):
+        os.makedirs('grades')
 
     response = requests.get(URL_JSON)
     dados = response.json()
