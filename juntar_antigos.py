@@ -13,7 +13,7 @@ else:
     df_consolidado = pd.concat(lista_dfs)
 
     # 3. Remover duplicatas
-    df_consolidado = df_consolidado.drop_duplicates(subset=['Dia', 'Horário', 'Programa'], keep='first')
+    df_consolidado = df_consolidado.drop_duplicates(subset=['Dia', 'Hora', 'Programa'], keep='first')
 
     # --- NOVO: Ordenar por Data e Hora ---
     # Transforma temporariamente em data real para ordenar (formato DD/MM/YYYY)
