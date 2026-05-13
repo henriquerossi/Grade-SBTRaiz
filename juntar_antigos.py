@@ -13,7 +13,7 @@ else:
     df_consolidado = pd.concat(lista_dfs)
 
     # 3. Remover duplicatas (mesmo dia, hora e programa)
-    df_consolidado = df_consolidado.drop_duplicates(subset=['Dia', 'Horário', 'Programa'], keep='first')
+    df_consolidado = df_consolidado.drop_duplicates(subset=['Data', 'Hora', 'Programa'], keep='first')
 
     # 4. Salvar na raiz
     df_consolidado.to_csv("grade_completa.csv", index=False, encoding='utf-8-sig')
