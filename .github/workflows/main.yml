@@ -21,7 +21,7 @@ jobs:
         run: pip install pandas requests
 
       - name: Executar script de processamento
-        run: python limpar_mestre.py
+        run: python processar_grade.py
 
       - name: Salvar Mudanças no Github
         run: |
