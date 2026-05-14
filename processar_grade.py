@@ -1,69 +1,80 @@
 import pandas as pd
 import requests
 import os
+import re
 from datetime import datetime
 
-# URL do JSON do canal
+# Configurações
 URL_JSON = "https://bridge.evrideo.tv/SBTEPG?ChannelUID=raiz&DurationHours=168"
 ARQUIVO_MESTRE = "grade_completa.csv"
 
+def extrair_data_episodio(texto):
+    """Procura data DD/MM/YYYY no nome do episódio para ordenação."""
+    match = re.search(r'(\d{2}/\d{2}/\d{4})', str(texto))
+    if match:
+        try:
+            return pd.to_datetime(match.group(1), format='%d/%m/%Y')
+        except:
+            return None
+    return None
+
 try:
-    # 1. Criar a pasta 'grades' se ela não existir
+    # 1. Preparar ambiente
     if not os.path.exists('grades'):
         os.makedirs('grades')
 
-    # 2. Coleta de dados
+    # 2. Captura de dados
     response = requests.get(URL_JSON)
-    dados = response.json()
-    df = pd.DataFrame(dados)
+    df = pd.DataFrame(response.json())
 
-    # 3. Extrair 'content_episode' de 'macros'
+    # 3. Tratamento de Metadados e Datas de Exibição
     df_macros = pd.json_normalize(df['macros'])
-    df['content_episode'] = df_macros['content_episode']
-
-    # 4. Tratar Datas e Horários (Fuso de Brasília)
+    df['content_episode'] = df_macros['content_episode'] # Mantemos aqui apenas para o backup individual
+    
     dt_series = pd.to_datetime(df['startTime'], unit='ms').dt.tz_localize('UTC').dt.tz_convert('America/Sao_Paulo')
-    df['dia'] = dt_series.dt.strftime('%d/%m/%Y')
-    df['horario'] = dt_series.dt.strftime('%H:%M')
+    df['Data'] = dt_series.dt.strftime('%d/%m/%Y')
+    df['Hora'] = dt_series.dt.strftime('%H:%M')
 
-    # 5. Selecionar e renomear colunas seguindo o seu padrão exato
-    df_resultado = df[['dia', 'horario', 'title', 'episodeName', 'content_episode', 'mediaId']].copy()
-    df_resultado = df_resultado.rename(columns={
-        'dia': 'Data',
-        'horario': 'Hora',
-        'title': 'Programa',
-        'episodeName': 'Episódio',
-        'content_episode': 'Nº do episódio',
-        'mediaId': 'Media'
-    })
+    # Renomear para o seu padrão
+    df = df.rename(columns={'title': 'Programa', 'episodeName': 'Episódio', 'mediaId': 'Media'})
 
-    # --- AÇÃO 1: Salvar Backup Individual na pasta 'grades' ---
+    # --- PASSO A: SALVAR BACKUP COMPLETO (Histórico individual) ---
+    # Aqui mantemos Hora e Nº do episódio caso você precise consultar no futuro
+    df_backup = df[['Data', 'Hora', 'Programa', 'Episódio', 'content_episode', 'Media']].copy()
+    df_backup = df_backup.rename(columns={'content_episode': 'Nº do episódio'})
+    
     data_hoje = datetime.now().strftime('%Y-%m-%d')
-    nome_arquivo_backup = f"grades/grade_{data_hoje}.csv"
-    df_resultado.to_csv(nome_arquivo_backup, index=False, encoding='utf-8-sig')
+    df_backup.to_csv(f"grades/grade_{data_hoje}.csv", index=False, encoding='utf-8-sig')
 
-    # --- AÇÃO 2: Atualizar Arquivo Mestre na Raiz ---
+    # --- PASSO B: ATUALIZAR CATÁLOGO (grade_completa.csv) ---
+    # Selecionamos apenas as colunas que você quer no catálogo
+    df_novo_item = df[['Data', 'Programa', 'Episódio', 'Media']].copy()
+
     if os.path.exists(ARQUIVO_MESTRE):
-        # Lê o mestre que já existe
         df_mestre = pd.read_csv(ARQUIVO_MESTRE)
-        
-        # Junta o antigo com o novo
-        df_final = pd.concat([df_mestre, df_resultado])
-        
-        # Remove duplicados (mesma Data, Hora e Programa)
-        df_final = df_final.drop_duplicates(subset=['Data', 'Hora', 'Programa'], keep='first')
-        
-        # Ordenação cronológica correta
-        df_final['Data_Temp'] = pd.to_datetime(df_final['Data'], format='%d/%m/%Y')
-        df_final = df_final.sort_values(by=['Data_Temp', 'Hora']).drop(columns=['Data_Temp'])
+        # Unir o que já existe com os novos dados capturados
+        df_final = pd.concat([df_mestre, df_novo_item])
     else:
-        # Se o mestre não existir, ele será o próprio resultado novo
-        df_final = df_resultado
+        df_final = df_novo_item
 
-    # Salva o arquivo mestre consolidado na raiz
+    # 1. Remover Duplicatas (Mantendo o primeiro registro encontrado)
+    df_final = df_final.drop_duplicates(subset=['Media', 'Programa', 'Episódio'], keep='first')
+
+    # 2. Ordenação Inteligente
+    # Criamos uma coluna de data real baseada no título do episódio
+    df_final['Data_Ref'] = df_final['Episódio'].apply(extrair_data_episodio)
+    
+    # Se não houver data no título, usa a data de exibição como reserva para ordenar
+    df_final['Data_Ref'] = df_final['Data_Ref'].fillna(pd.to_datetime(df_final['Data'], format='%d/%m/%Y'))
+
+    # Ordena por Programa e depois pela data do conteúdo
+    df_final = df_final.sort_values(by=['Programa', 'Data_Ref'], ascending=[True, True])
+
+    # 3. Remover a coluna de referência e salvar
+    df_final = df_final.drop(columns=['Data_Ref'])
     df_final.to_csv(ARQUIVO_MESTRE, index=False, encoding='utf-8-sig')
     
-    print(f"Sucesso: Backup '{nome_arquivo_backup}' e arquivo mestre '{ARQUIVO_MESTRE}' atualizados!")
+    print(f"Processo concluído: {len(df_final)} itens únicos no catálogo.")
 
 except Exception as e:
     print(f"Erro no processamento: {e}")
