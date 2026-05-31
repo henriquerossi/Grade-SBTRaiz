@@ -1,80 +1,49 @@
 import pandas as pd
-import requests
 import os
-import re
-from datetime import datetime
 
-# Configurações
-URL_JSON = "https://bridge.evrideo.tv/SBTEPG?ChannelUID=raiz&DurationHours=168"
+# CONFIGURAÇÃO
 ARQUIVO_MESTRE = "grade_completa.csv"
+ARQUIVO_EXTERNO = "programas1.csv" # Nome do arquivo que você quer inserir
 
-def extrair_data_episodio(texto):
-    """Procura data DD/MM/YYYY no nome do episódio para ordenação."""
-    match = re.search(r'(\d{2}/\d{2}/\d{4})', str(texto))
-    if match:
-        try:
-            return pd.to_datetime(match.group(1), format='%d/%m/%Y')
-        except:
-            return None
-    return None
-
-try:
-    # 1. Preparar ambiente
-    if not os.path.exists('grades'):
-        os.makedirs('grades')
-
-    # 2. Captura de dados
-    response = requests.get(URL_JSON)
-    df = pd.DataFrame(response.json())
-
-    # 3. Tratamento de Metadados e Datas de Exibição
-    df_macros = pd.json_normalize(df['macros'])
-    df['content_episode'] = df_macros['content_episode'] # Mantemos aqui apenas para o backup individual
+if os.path.exists(ARQUIVO_EXTERNO) and os.path.exists(ARQUIVO_MESTRE):
+    # 1. Carrega os dois arquivos
+    df_mestre = pd.read_csv(ARQUIVO_MESTRE)
+    df_externo = pd.read_csv(ARQUIVO_EXTERNO)
     
-    dt_series = pd.to_datetime(df['startTime'], unit='ms').dt.tz_localize('UTC').dt.tz_convert('America/Sao_Paulo')
-    df['Data'] = dt_series.dt.strftime('%d/%m/%Y')
-    df['Hora'] = dt_series.dt.strftime('%H:%M')
+    print(f"Linhas no mestre: {len(df_mestre)}")
+    print(f"Linhas no externo: {len(df_externo)}")
 
-    # Renomear para o seu padrão
-    df = df.rename(columns={'title': 'Programa', 'episodeName': 'Episódio', 'mediaId': 'Media'})
+    # 2. Padroniza as colunas do externo para garantir que batam com o mestre
+    # (Ajuste os nomes à esquerda se o seu CSV externo usar nomes diferentes)
+    df_externo = df_externo.rename(columns={
+        'dia': 'Data', 
+        'title': 'Programa', 
+        'episodeName': 'Episódio', 
+        'mediaId': 'Media'
+    })
 
-    # --- PASSO A: SALVAR BACKUP COMPLETO (Histórico individual) ---
-    # Aqui mantemos Hora e Nº do episódio caso você precise consultar no futuro
-    df_backup = df[['Data', 'Hora', 'Programa', 'Episódio', 'content_episode', 'Media']].copy()
-    df_backup = df_backup.rename(columns={'content_episode': 'Nº do episódio'})
+    # 3. Garante que o externo tenha apenas as colunas que o mestre usa
+    # (Removendo 'Hora' ou 'Nº do episódio' se existirem no externo)
+    colunas_mestre = ['Data', 'Programa', 'Episódio', 'Media']
+    df_externo = df_externo[colunas_mestre]
+
+    # 4. Junta os dois
+    df_combinado = pd.concat([df_mestre, df_externo], ignore_index=True)
+
+    # 5. REMOVE DUPLICATAS
+    # Ele olha para Media, Programa e Episódio. Se forem iguais, ele apaga a cópia.
+    df_combinado = df_combinado.drop_duplicates(subset=['Media', 'Programa', 'Episódio'], keep='first')
+
+    # 6. Re-ordena tudo por Data (para não ficar bagunçado no meio)
+    df_combinado['Data_Temp'] = pd.to_datetime(df_combinado['Data'], format='%d/%m/%Y', errors='coerce')
+    df_combinado = df_combinado.sort_values(by=['Programa', 'Data_Temp'], ascending=[True, True])
+    df_combinado = df_combinado.drop(columns=['Data_Temp'])
+
+    # 7. Salva o resultado final no grade_completa.csv
+    df_combinado.to_csv(ARQUIVO_MESTRE, index=False, encoding='utf-8-sig')
     
-    data_hoje = datetime.now().strftime('%Y-%m-%d')
-    df_backup.to_csv(f"grades/grade_{data_hoje}.csv", index=False, encoding='utf-8-sig')
+    print(f"Sucesso! Novo total de linhas: {len(df_combinado)}")
+    print(f"Foram adicionados {len(df_combinado) - len(df_mestre)} novos registros únicos.")
 
-    # --- PASSO B: ATUALIZAR CATÁLOGO (grade_completa.csv) ---
-    # Selecionamos apenas as colunas que você quer no catálogo
-    df_novo_item = df[['Data', 'Programa', 'Episódio', 'Media']].copy()
-
-    if os.path.exists(ARQUIVO_MESTRE):
-        df_mestre = pd.read_csv(ARQUIVO_MESTRE)
-        # Unir o que já existe com os novos dados capturados
-        df_final = pd.concat([df_mestre, df_novo_item])
-    else:
-        df_final = df_novo_item
-
-    # 1. Remover Duplicatas (Mantendo o primeiro registro encontrado)
-    df_final = df_final.drop_duplicates(subset=['Media', 'Programa', 'Episódio'], keep='first')
-
-    # 2. Ordenação Inteligente
-    # Criamos uma coluna de data real baseada no título do episódio
-    df_final['Data_Ref'] = df_final['Episódio'].apply(extrair_data_episodio)
-    
-    # Se não houver data no título, usa a data de exibição como reserva para ordenar
-    df_final['Data_Ref'] = df_final['Data_Ref'].fillna(pd.to_datetime(df_final['Data'], format='%d/%m/%Y'))
-
-    # Ordena por Programa e depois pela data do conteúdo
-    df_final = df_final.sort_values(by=['Programa', 'Data_Ref'], ascending=[True, True])
-
-    # 3. Remover a coluna de referência e salvar
-    df_final = df_final.drop(columns=['Data_Ref'])
-    df_final.to_csv(ARQUIVO_MESTRE, index=False, encoding='utf-8-sig')
-    
-    print(f"Processo concluído: {len(df_final)} itens únicos no catálogo.")
-
-except Exception as e:
-    print(f"Erro no processamento: {e}")
+else:
+    print("Erro: Verifique se os nomes dos arquivos estão corretos e se ambos estão na mesma pasta.")
