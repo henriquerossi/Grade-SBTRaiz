@@ -5,7 +5,7 @@ import re
 from datetime import datetime
 
 # Configurações
-URL_JSON = "https://bridge.evrideo.tv/SBTEPG?ChannelUID=raiz&DurationHours=168"
+URL_JSON = "https://d31l2nn7dlh4li.cloudfront.net/amg00527/epg_deliveries/amgplt0764/amg00527c8/amg00527c8.json"
 ARQUIVO_MESTRE = "grade_completa.csv"
 
 def extrair_data_episodio(texto):
